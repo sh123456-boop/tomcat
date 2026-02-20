@@ -1,14 +1,17 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
-import { Trend, Rate, Counter } from 'k6/metrics';
+import exec from 'k6/execution';
+import { Trend, Rate, Counter, Gauge } from 'k6/metrics';
 
-const WS_URL = __ENV.WS_URL || 'ws://172.31.51.38:8080/ws/bench';
+const WS_URL = __ENV.WS_URL || 'ws://172.31.58.37:8080/ws/bench';
 const MESSAGE_INTERVAL_MS = Number(__ENV.MESSAGE_INTERVAL_MS || 1000);
 const SESSION_MS = Number(__ENV.SESSION_MS || 60000);
 
 export const ws_rtt = new Trend('ws_rtt', true);
 export const ws_connect_success = new Rate('ws_connect_success');
 export const ws_message_errors = new Counter('ws_message_errors');
+export const ws_message_error_rate = new Rate('ws_message_error_rate');
+export const ws_active_vus_on_success = new Gauge('ws_active_vus_on_success');
 
 export const options = {
   scenarios: {
@@ -27,8 +30,9 @@ export const options = {
     },
   },
   thresholds: {
-    ws_connect_success: ['rate>0.98'],
-    ws_rtt: ['p(95)<1000'],
+    ws_connect_success: [{ threshold: 'rate>0.98', abortOnFail: true, delayAbortEval: '30s' }],
+    ws_rtt: [{ threshold: 'p(95)<1000', abortOnFail: true, delayAbortEval: '30s' }],
+    ws_message_error_rate: [{ threshold: 'rate<0.02', abortOnFail: true, delayAbortEval: '30s' }],
   },
 };
 
@@ -38,7 +42,9 @@ export default function () {
 
   const res = ws.connect(WS_URL, {}, function (socket) {
     socket.on('open', () => {
-      const ticker = socket.setInterval(() => {
+      ws_active_vus_on_success.add(exec.instance.vusActive);
+
+      socket.setInterval(() => {
         sequence += 1;
         const id = `${__VU}-${__ITER}-${sequence}`;
         const sentAt = Date.now();
@@ -49,7 +55,6 @@ export default function () {
       }, MESSAGE_INTERVAL_MS);
 
       socket.setTimeout(() => {
-        socket.clearInterval(ticker);
         socket.close();
       }, SESSION_MS);
     });
@@ -62,19 +67,24 @@ export default function () {
         const data = JSON.parse(text);
         if (!data.id || !pending.has(data.id)) {
           ws_message_errors.add(1);
+          ws_message_error_rate.add(1);
           return;
         }
 
         const rtt = Date.now() - pending.get(data.id);
         ws_rtt.add(rtt);
+        ws_message_error_rate.add(0);
+        ws_active_vus_on_success.add(exec.instance.vusActive);
         pending.delete(data.id);
       } catch (_) {
         ws_message_errors.add(1);
+        ws_message_error_rate.add(1);
       }
     });
 
     socket.on('error', () => {
       ws_message_errors.add(1);
+      ws_message_error_rate.add(1);
     });
   });
 
