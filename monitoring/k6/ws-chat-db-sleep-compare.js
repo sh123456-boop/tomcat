@@ -2,7 +2,7 @@ import ws from 'k6/ws';
 import { check } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 
-const WS_URL = __ENV.WS_URL || 'ws://172.31.51.38:8080/ws/chat';
+const WS_URL = __ENV.WS_URL || 'ws://172.31.58.37:8080/ws/chat';
 const ROOM_PREFIX = __ENV.ROOM_PREFIX || 'sleep-room';
 const LIMIT = Number(__ENV.LIMIT || 1);
 const SLEEP_MS = Number(__ENV.SLEEP_MS || 50);

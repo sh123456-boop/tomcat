@@ -34,18 +34,16 @@ public class WsChatRepository {
         jdbcTemplate.queryForObject("SELECT SLEEP(?)", Integer.class, seconds);
     }
 
-    public WsChatMessage save(String roomId, String sender, String message) {
-        jdbcTemplate.update(
+    public void save(String roomId, String sender, String message) {
+        int updatedRows = jdbcTemplate.update(
                 "INSERT INTO ws_chat_messages (room_id, sender, message) VALUES (?, ?, ?)",
                 roomId,
                 sender,
                 message
         );
-        Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-        if (id == null) {
-            throw new IllegalStateException("failed to get inserted message id");
+        if (updatedRows == 0) {
+            throw new IllegalStateException("failed to insert message");
         }
-        return findById(id);
     }
 
     public List<WsChatMessage> findRecent(String roomId, int limit) {
@@ -67,23 +65,5 @@ public class WsChatRepository {
                 roomId,
                 limit
         );
-    }
-
-    private WsChatMessage findById(long id) {
-        List<WsChatMessage> rows = jdbcTemplate.query(
-                "SELECT id, room_id, sender, message, created_at FROM ws_chat_messages WHERE id = ?",
-                (rs, rowNum) -> new WsChatMessage(
-                        rs.getLong("id"),
-                        rs.getString("room_id"),
-                        rs.getString("sender"),
-                        rs.getString("message"),
-                        rs.getObject("created_at", Timestamp.class).toLocalDateTime()
-                ),
-                id
-        );
-        if (rows.isEmpty()) {
-            throw new IllegalStateException("inserted message not found. id=" + id);
-        }
-        return rows.getFirst();
     }
 }
