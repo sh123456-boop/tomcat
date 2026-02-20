@@ -2,9 +2,10 @@ import ws from 'k6/ws';
 import { check } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 
-const WS_URL = __ENV.WS_URL || 'ws://172.31.54.19:8080/ws/chat';
-const ROOM_PREFIX = __ENV.ROOM_PREFIX || 'k6-room';
+const WS_URL = __ENV.WS_URL || 'ws://172.31.51.38:8080/ws/chat';
+const ROOM_PREFIX = __ENV.ROOM_PREFIX || 'sleep-room';
 const LIMIT = Number(__ENV.LIMIT || 1);
+const SLEEP_MS = Number(__ENV.SLEEP_MS || 50);
 
 export const ws_connect_success = new Rate('ws_connect_success');
 export const ws_save_success = new Rate('ws_save_success');
@@ -12,29 +13,31 @@ export const ws_read_success = new Rate('ws_read_success');
 export const ws_message_error_rate = new Rate('ws_message_error_rate');
 export const ws_save_rtt = new Trend('ws_save_rtt', true);
 export const ws_read_rtt = new Trend('ws_read_rtt', true);
+export const ws_total_rtt = new Trend('ws_total_rtt', true);
 export const ws_errors = new Counter('ws_errors');
 
 export const options = {
   scenarios: {
-    ws_chat_db: {
+    ws_chat_db_sleep_compare: {
       executor: 'ramping-vus',
-      startVUs: Number(__ENV.START_VUS || 10),
+      startVUs: Number(__ENV.START_VUS || 30),
       stages: [
-        { duration: __ENV.STAGE_1 || '45s', target: Number(__ENV.TARGET_VUS_1 || 40) },
-        { duration: __ENV.STAGE_2 || '45s', target: Number(__ENV.TARGET_VUS_2 || 90) },
-        { duration: __ENV.STAGE_3 || '45s', target: Number(__ENV.TARGET_VUS_3 || 140) },
-        { duration: __ENV.STAGE_4 || '30s', target: 0 },
+        { duration: __ENV.STAGE_1 || '1m', target: Number(__ENV.TARGET_VUS_1 || 120) },
+        { duration: __ENV.STAGE_2 || '1m', target: Number(__ENV.TARGET_VUS_2 || 250) },
+        { duration: __ENV.STAGE_3 || '1m', target: Number(__ENV.TARGET_VUS_3 || 450) },
+        { duration: __ENV.STAGE_4 || '1m', target: Number(__ENV.TARGET_VUS_4 || 700) },
+        { duration: __ENV.STAGE_5 || '40s', target: 0 },
       ],
-      gracefulRampDown: '15s',
+      gracefulRampDown: '20s',
     },
   },
   thresholds: {
-    ws_connect_success: [{ threshold: 'rate>0.99', abortOnFail: true, delayAbortEval: '20s' }],
-    ws_save_success: [{ threshold: 'rate>0.97', abortOnFail: true, delayAbortEval: '20s' }],
-    ws_read_success: [{ threshold: 'rate>0.97', abortOnFail: true, delayAbortEval: '20s' }],
-    ws_message_error_rate: [{ threshold: 'rate<0.03', abortOnFail: true, delayAbortEval: '20s' }],
-    ws_save_rtt: [{ threshold: 'p(95)<1500', abortOnFail: true, delayAbortEval: '20s' }],
-    ws_read_rtt: [{ threshold: 'p(95)<1500', abortOnFail: true, delayAbortEval: '20s' }],
+    ws_connect_success: [{ threshold: 'rate>0.99', abortOnFail: true, delayAbortEval: '30s' }],
+    ws_save_success: [{ threshold: 'rate>0.95', abortOnFail: true, delayAbortEval: '30s' }],
+    ws_read_success: [{ threshold: 'rate>0.95', abortOnFail: true, delayAbortEval: '30s' }],
+    ws_message_error_rate: [{ threshold: 'rate<0.05', abortOnFail: true, delayAbortEval: '30s' }],
+    ws_save_rtt: [{ threshold: 'p(95)<3000', abortOnFail: true, delayAbortEval: '30s' }],
+    ws_read_rtt: [{ threshold: 'p(95)<3000', abortOnFail: true, delayAbortEval: '30s' }],
   },
 };
 
@@ -49,10 +52,11 @@ function parseJsonSafe(raw) {
 export default function () {
   const roomId = `${ROOM_PREFIX}-${__VU}-${__ITER}`;
   const sender = `vu-${__VU}`;
-  const text = `hello-${__VU}-${__ITER}-${Date.now()}`;
+  const text = `sleep-${SLEEP_MS}-vu-${__VU}-iter-${__ITER}-${Date.now()}`;
 
   let saveSentAt = 0;
   let readSentAt = 0;
+  let totalStartedAt = 0;
   let saveDone = false;
   let readDone = false;
 
@@ -63,8 +67,10 @@ export default function () {
         roomId,
         sender,
         message: text,
+        sleepMs: SLEEP_MS,
       });
-      saveSentAt = Date.now();
+      totalStartedAt = Date.now();
+      saveSentAt = totalStartedAt;
       socket.send(savePayload);
     });
 
@@ -89,6 +95,7 @@ export default function () {
             action: 'read',
             roomId,
             limit: LIMIT,
+            sleepMs: SLEEP_MS,
           });
           readSentAt = Date.now();
           saveDone = true;
@@ -99,6 +106,8 @@ export default function () {
 
       if (parsed.action === 'read') {
         ws_read_rtt.add(Date.now() - readSentAt);
+        ws_total_rtt.add(Date.now() - totalStartedAt);
+
         const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
         const found = messages.some((m) => m && m.roomId === roomId && m.sender === sender && m.message === text);
         ws_read_success.add(found);
@@ -119,7 +128,7 @@ export default function () {
         ws_message_error_rate.add(1);
       }
       socket.close();
-    }, Number(__ENV.SESSION_TIMEOUT_MS || 15000));
+    }, Number(__ENV.SESSION_TIMEOUT_MS || 30000));
   });
 
   const connected = check(res, {

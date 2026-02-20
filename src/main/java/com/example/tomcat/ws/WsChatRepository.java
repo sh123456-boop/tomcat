@@ -29,6 +29,11 @@ public class WsChatRepository {
         jdbcTemplate.execute(CREATE_TABLE_SQL);
     }
 
+    public void sleep(int sleepMs) {
+        double seconds = sleepMs / 1000.0;
+        jdbcTemplate.queryForObject("SELECT SLEEP(?)", Integer.class, seconds);
+    }
+
     public WsChatMessage save(String roomId, String sender, String message) {
         jdbcTemplate.update(
                 "INSERT INTO ws_chat_messages (room_id, sender, message) VALUES (?, ?, ?)",

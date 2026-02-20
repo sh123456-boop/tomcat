@@ -40,6 +40,10 @@ public class WsChatService {
         String roomId = requiredText(request, "roomId");
         String sender = requiredText(request, "sender");
         String message = requiredText(request, "message");
+        int sleepMs = sanitizeSleepMs(request.path("sleepMs").asInt(0));
+        if (sleepMs > 0) {
+            wsChatRepository.sleep(sleepMs);
+        }
 
         WsChatMessage saved = wsChatRepository.save(roomId, sender, message);
 
@@ -53,6 +57,10 @@ public class WsChatService {
     private String handleRead(JsonNode request) throws Exception {
         String roomId = requiredText(request, "roomId");
         int limit = sanitizeLimit(request.path("limit").asInt(50));
+        int sleepMs = sanitizeSleepMs(request.path("sleepMs").asInt(0));
+        if (sleepMs > 0) {
+            wsChatRepository.sleep(sleepMs);
+        }
 
         List<WsChatMessage> messages = wsChatRepository.findRecent(roomId, limit);
 
@@ -104,6 +112,13 @@ public class WsChatService {
             return 1;
         }
         return Math.min(limit, 200);
+    }
+
+    private int sanitizeSleepMs(int sleepMs) {
+        if (sleepMs < 0) {
+            return 0;
+        }
+        return Math.min(sleepMs, 5000);
     }
 
     private boolean looksLikeJson(String payload) {
