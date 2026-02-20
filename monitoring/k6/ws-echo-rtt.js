@@ -3,7 +3,7 @@ import { check } from 'k6';
 import exec from 'k6/execution';
 import { Trend, Rate, Counter, Gauge } from 'k6/metrics';
 
-const WS_URL = __ENV.WS_URL || 'ws://172.31.58.37:8080/ws/bench';
+const WS_URL = __ENV.WS_URL || 'ws://127.0.0.1:8080/ws/echo';
 const MESSAGE_INTERVAL_MS = Number(__ENV.MESSAGE_INTERVAL_MS || 700);
 const SESSION_MS = Number(__ENV.SESSION_MS || 60000);
 

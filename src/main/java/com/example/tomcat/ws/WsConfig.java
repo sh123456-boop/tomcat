@@ -9,14 +9,17 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WsConfig implements WebSocketConfigurer {
 
-    private final BenchWebSocketHandler benchWebSocketHandler;
+    private final BenchWebSocketHandler echoWebSocketHandler;
+    private final WsChatWebSocketHandler chatWebSocketHandler;
 
-    public WsConfig(BenchWebSocketHandler benchWebSocketHandler) {
-        this.benchWebSocketHandler = benchWebSocketHandler;
+    public WsConfig(BenchWebSocketHandler echoWebSocketHandler, WsChatWebSocketHandler chatWebSocketHandler) {
+        this.echoWebSocketHandler = echoWebSocketHandler;
+        this.chatWebSocketHandler = chatWebSocketHandler;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(benchWebSocketHandler, "/ws/bench").setAllowedOriginPatterns("*");
+        registry.addHandler(echoWebSocketHandler, "/ws/echo", "/ws/bench").setAllowedOriginPatterns("*");
+        registry.addHandler(chatWebSocketHandler, "/ws/chat").setAllowedOriginPatterns("*");
     }
 }

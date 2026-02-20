@@ -2,7 +2,7 @@ import ws from 'k6/ws';
 import { check } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 
-const WS_URL = __ENV.WS_URL || 'ws://127.0.0.1:8080/ws/bench';
+const WS_URL = __ENV.WS_URL || 'ws://127.0.0.1:8080/ws/chat';
 const ROOM_PREFIX = __ENV.ROOM_PREFIX || 'k6-room';
 const LIMIT = Number(__ENV.LIMIT || 1);
 

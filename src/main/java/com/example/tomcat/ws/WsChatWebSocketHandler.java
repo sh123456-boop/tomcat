@@ -8,12 +8,14 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 @Component
-public class BenchWebSocketHandler extends TextWebSocketHandler {
+public class WsChatWebSocketHandler extends TextWebSocketHandler {
 
     private final WsMetrics wsMetrics;
+    private final WsChatService wsChatService;
 
-    public BenchWebSocketHandler(WsMetrics wsMetrics) {
+    public WsChatWebSocketHandler(WsMetrics wsMetrics, WsChatService wsChatService) {
         this.wsMetrics = wsMetrics;
+        this.wsChatService = wsChatService;
     }
 
     @Override
@@ -24,7 +26,8 @@ public class BenchWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
         wsMetrics.onMessage();
-        session.sendMessage(new TextMessage("echo:" + message.getPayload()));
+        String response = wsChatService.handle(message.getPayload());
+        session.sendMessage(new TextMessage(response));
     }
 
     @Override
