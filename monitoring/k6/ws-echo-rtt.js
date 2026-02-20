@@ -4,7 +4,7 @@ import exec from 'k6/execution';
 import { Trend, Rate, Counter, Gauge } from 'k6/metrics';
 
 const WS_URL = __ENV.WS_URL || 'ws://172.31.58.37:8080/ws/bench';
-const MESSAGE_INTERVAL_MS = Number(__ENV.MESSAGE_INTERVAL_MS || 1000);
+const MESSAGE_INTERVAL_MS = Number(__ENV.MESSAGE_INTERVAL_MS || 700);
 const SESSION_MS = Number(__ENV.SESSION_MS || 60000);
 
 export const ws_rtt = new Trend('ws_rtt', true);
@@ -17,16 +17,16 @@ export const options = {
   scenarios: {
     ws_chat_like: {
       executor: 'ramping-vus',
-      startVUs: Number(__ENV.START_VUS || 50),
+      startVUs: Number(__ENV.START_VUS || 100),
       stages: [
-        { duration: __ENV.STAGE_1 || '1m', target: Number(__ENV.TARGET_VUS_1 || 150) },
-        { duration: __ENV.STAGE_2 || '1m', target: Number(__ENV.TARGET_VUS_2 || 300) },
-        { duration: __ENV.STAGE_3 || '1m', target: Number(__ENV.TARGET_VUS_3 || 500) },
-        { duration: __ENV.STAGE_4 || '1m', target: Number(__ENV.TARGET_VUS_4 || 700) },
-        { duration: __ENV.STAGE_5 || '1m', target: Number(__ENV.TARGET_VUS_5 || 900) },
-        { duration: __ENV.STAGE_6 || '1m', target: Number(__ENV.TARGET_VUS_6 || 1100) },
+        { duration: __ENV.STAGE_1 || '90s', target: Number(__ENV.TARGET_VUS_1 || 400) },
+        { duration: __ENV.STAGE_2 || '90s', target: Number(__ENV.TARGET_VUS_2 || 800) },
+        { duration: __ENV.STAGE_3 || '90s', target: Number(__ENV.TARGET_VUS_3 || 1200) },
+        { duration: __ENV.STAGE_4 || '90s', target: Number(__ENV.TARGET_VUS_4 || 1600) },
+        { duration: __ENV.STAGE_5 || '90s', target: Number(__ENV.TARGET_VUS_5 || 1900) },
+        { duration: __ENV.STAGE_6 || '90s', target: Number(__ENV.TARGET_VUS_6 || 2200) },
       ],
-      gracefulRampDown: '20s',
+      gracefulRampDown: '30s',
     },
   },
   thresholds: {

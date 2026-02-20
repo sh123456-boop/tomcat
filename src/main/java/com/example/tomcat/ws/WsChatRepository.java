@@ -25,8 +25,11 @@ public class WsChatRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public void ensureSchema() {
+        jdbcTemplate.execute(CREATE_TABLE_SQL);
+    }
+
     public WsChatMessage save(String roomId, String sender, String message) {
-        ensureSchema();
         jdbcTemplate.update(
                 "INSERT INTO ws_chat_messages (room_id, sender, message) VALUES (?, ?, ?)",
                 roomId,
@@ -41,7 +44,6 @@ public class WsChatRepository {
     }
 
     public List<WsChatMessage> findRecent(String roomId, int limit) {
-        ensureSchema();
         return jdbcTemplate.query(
                 """
                 SELECT id, room_id, sender, message, created_at
@@ -78,9 +80,5 @@ public class WsChatRepository {
             throw new IllegalStateException("inserted message not found. id=" + id);
         }
         return rows.getFirst();
-    }
-
-    private void ensureSchema() {
-        jdbcTemplate.execute(CREATE_TABLE_SQL);
     }
 }

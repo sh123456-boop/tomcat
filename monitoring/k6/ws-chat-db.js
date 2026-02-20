@@ -3,8 +3,8 @@ import { check } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 
 const WS_URL = __ENV.WS_URL || 'ws://127.0.0.1:8080/ws/bench';
-const ROOM_ID = __ENV.ROOM_ID || 'k6-room';
-const LIMIT = Number(__ENV.LIMIT || 20);
+const ROOM_PREFIX = __ENV.ROOM_PREFIX || 'k6-room';
+const LIMIT = Number(__ENV.LIMIT || 1);
 
 export const ws_connect_success = new Rate('ws_connect_success');
 export const ws_save_success = new Rate('ws_save_success');
@@ -18,23 +18,23 @@ export const options = {
   scenarios: {
     ws_chat_db: {
       executor: 'ramping-vus',
-      startVUs: Number(__ENV.START_VUS || 5),
+      startVUs: Number(__ENV.START_VUS || 10),
       stages: [
-        { duration: __ENV.STAGE_1 || '30s', target: Number(__ENV.TARGET_VUS_1 || 20) },
-        { duration: __ENV.STAGE_2 || '30s', target: Number(__ENV.TARGET_VUS_2 || 50) },
-        { duration: __ENV.STAGE_3 || '30s', target: Number(__ENV.TARGET_VUS_3 || 80) },
-        { duration: __ENV.STAGE_4 || '20s', target: 0 },
+        { duration: __ENV.STAGE_1 || '45s', target: Number(__ENV.TARGET_VUS_1 || 40) },
+        { duration: __ENV.STAGE_2 || '45s', target: Number(__ENV.TARGET_VUS_2 || 90) },
+        { duration: __ENV.STAGE_3 || '45s', target: Number(__ENV.TARGET_VUS_3 || 140) },
+        { duration: __ENV.STAGE_4 || '30s', target: 0 },
       ],
-      gracefulRampDown: '10s',
+      gracefulRampDown: '15s',
     },
   },
   thresholds: {
-    ws_connect_success: ['rate>0.99'],
-    ws_save_success: ['rate>0.97'],
-    ws_read_success: ['rate>0.97'],
-    ws_message_error_rate: ['rate<0.03'],
-    ws_save_rtt: ['p(95)<1500'],
-    ws_read_rtt: ['p(95)<1500'],
+    ws_connect_success: [{ threshold: 'rate>0.99', abortOnFail: true, delayAbortEval: '20s' }],
+    ws_save_success: [{ threshold: 'rate>0.97', abortOnFail: true, delayAbortEval: '20s' }],
+    ws_read_success: [{ threshold: 'rate>0.97', abortOnFail: true, delayAbortEval: '20s' }],
+    ws_message_error_rate: [{ threshold: 'rate<0.03', abortOnFail: true, delayAbortEval: '20s' }],
+    ws_save_rtt: [{ threshold: 'p(95)<1500', abortOnFail: true, delayAbortEval: '20s' }],
+    ws_read_rtt: [{ threshold: 'p(95)<1500', abortOnFail: true, delayAbortEval: '20s' }],
   },
 };
 
@@ -47,6 +47,7 @@ function parseJsonSafe(raw) {
 }
 
 export default function () {
+  const roomId = `${ROOM_PREFIX}-${__VU}-${__ITER}`;
   const sender = `vu-${__VU}`;
   const text = `hello-${__VU}-${__ITER}-${Date.now()}`;
 
@@ -59,7 +60,7 @@ export default function () {
     socket.on('open', () => {
       const savePayload = JSON.stringify({
         action: 'save',
-        roomId: ROOM_ID,
+        roomId,
         sender,
         message: text,
       });
@@ -79,14 +80,14 @@ export default function () {
 
       if (parsed.action === 'save') {
         ws_save_rtt.add(Date.now() - saveSentAt);
-        const ok = !!(parsed.message && parsed.message.roomId === ROOM_ID && parsed.message.message === text);
+        const ok = !!(parsed.message && parsed.message.roomId === roomId && parsed.message.message === text);
         ws_save_success.add(ok);
         ws_message_error_rate.add(ok ? 0 : 1);
 
         if (ok) {
           const readPayload = JSON.stringify({
             action: 'read',
-            roomId: ROOM_ID,
+            roomId,
             limit: LIMIT,
           });
           readSentAt = Date.now();
@@ -99,7 +100,7 @@ export default function () {
       if (parsed.action === 'read') {
         ws_read_rtt.add(Date.now() - readSentAt);
         const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
-        const found = messages.some((m) => m && m.roomId === ROOM_ID && m.sender === sender && m.message === text);
+        const found = messages.some((m) => m && m.roomId === roomId && m.sender === sender && m.message === text);
         ws_read_success.add(found);
         ws_message_error_rate.add(found ? 0 : 1);
         readDone = true;
